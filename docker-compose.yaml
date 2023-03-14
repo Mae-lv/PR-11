@@ -1,0 +1,82 @@
+version: "3.9"
+services:
+  documents_service:
+    image: maelv/ma-docs-service:latest
+    ports:
+      - "8081:80"
+    command: bash -c "uvicorn app.main:app --host 0.0.0.0 --port 80 --reload"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost/__health" ]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 5s
+    restart: on-failure
+
+  krakend:
+    image: devopsfaith/krakend
+    volumes:
+      - "./config/krakend:/etc/krakend"
+    ports:
+      - "8080:8080"
+    command: [ "run", "-d", "--config", "/etc/krakend/krakend.json" ]
+    depends_on:
+      documents_service:
+        condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - krakend
+
+  grafana:
+    image: grafana/grafana-oss
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:latest
+    container_name: keycloak-db
+    user: root
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
+    ports:
+      - "25432:5432"
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+
+  keycloak:
+    image: jboss/keycloak:latest
+    container_name: keycloak
+    depends_on:
+      - keycloak-db
+    ports:
+      - "8403:8080"
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: keycloak-db
+      DB_PORT: 5432
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_PASSWORD: password
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+
+
+volumes:
+  keycloak-db:

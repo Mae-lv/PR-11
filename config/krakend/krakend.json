@@ -1,0 +1,116 @@
+{
+    "$schema": "https://www.krakend.io/schema/v3.json",
+    "version": 3,
+    "name": "PR11",
+    "timeout": "3000ms",
+    "cache_ttl": "300s",
+    "output_encoding": "json",
+    "port": 8080,
+    "endpoints": [
+      {
+        "endpoint": "/v1/new_document",
+        "method": "POST",
+        "output_encoding": "no-op",
+        "backend": [
+          {
+            "url_pattern": "/documents/",
+            "encoding": "json",
+            "sd": "static",
+            "method": "POST",
+            "extra_config": {},
+            "host": [
+              "http://documents_service"
+            ]
+          }
+        ],
+        "extra_config": {}
+      },
+      {
+        "endpoint": "/v1/documents/{id}",
+        "method": "GET",
+        "output_encoding": "json",
+        "backend": [
+          {
+            "url_pattern": "/documents/{id}",
+            "encoding": "json",
+            "sd": "static",
+            "method": "GET",
+            "extra_config": {},
+            "host": [
+              "http://documents_service"
+            ]
+          }
+        ],
+        "extra_config": {}
+      },
+      {
+        "endpoint": "/v1/documents", 
+        "method": "GET",
+        "output_encoding": "no-op",
+        "extra_config": {
+          "auth/validator": {
+            "alg": "RS256",
+            "jwk_url": "http://keycloak:8080/auth/realms/master/protocol/openid-connect/certs",
+            "disable_jwk_security": true
+          }
+        },
+        "backend": [
+          {
+            "url_pattern": "/documents/",
+            "encoding": "no-op",
+            "sd": "static",
+            "method": "GET",
+            "is_collection": true,
+            "mapping": {
+              "collection": "documents"
+            },
+            "extra_config": {},
+            "host": [
+              "http://documents_service"
+            ]
+          }
+        ]
+      },
+      {
+        "endpoint": "/v1/data",
+        "method": "GET",
+        "extra_config": {},
+        "backend": [
+          {
+            "url_pattern": "/documents/",
+            "sd": "static",
+            "method": "GET",
+            "is_collection": true,
+            "mapping": {
+              "collection": "documents"
+            },
+            "extra_config": {},
+            "host": [
+              "http://documents_service"
+            ]
+          }
+        ]
+      }
+    ],
+    "extra_config": {
+      "telemetry/opencensus": {
+        "sample_rate": 100,
+        "reporting_period": 0,
+        "exporters": {
+          "prometheus": {
+            "port": 9091,
+            "namespace": "krakend",
+            "tag_host": true,
+            "tag_path": true,
+            "tag_method": true,
+            "tag_statuscode": true
+          },
+          "jaeger": {
+            "endpoint": "http://jaeger:14268/api/traces",
+            "service_name": "krakend",
+            "buffer_max_count": 1000
+          }
+        }
+      }
+    }
+  }
